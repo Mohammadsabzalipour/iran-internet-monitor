@@ -1,13 +1,23 @@
 {
     "status": "Success",
-    "last_run": "2026-11-07T15:36:56Z",
+    "last_run": "2026-11-07T15:50:03Z",
     "cloudflare": {
         "http_percent": "63.327742",
         "other_percent": "36.672258",
-        "last_updated": "2026-11-07T14:15:00Z"
+        "last_updated": "2026-11-07T14:30:00Z"
     },
     "ioda": {
-        "bgp_value": 41762,
-        "active_probing_value": 11689
+        "bgp": {
+            "current": 41762,
+            "average": 41757,
+            "drop_percent": -0.0,
+            "status": "Normal"
+        },
+        "ping": {
+            "current": 11671,
+            "average": 11503,
+            "drop_percent": -1.5,
+            "status": "Normal"
+        }
     }
 }
