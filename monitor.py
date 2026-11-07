@@ -29,7 +29,6 @@ def get_cloudflare_data(token):
 
 def get_ioda_signal(source):
     print(f"--- Checking IODA: {source} ---")
-    # بازه ۲۴ ساعت گذشته
     until = int(time.time())
     from_time = until - (24 * 60 * 60)
     
@@ -40,16 +39,21 @@ def get_ioda_signal(source):
         "source": source
     }
     url = f"{base_url}?{urllib.parse.urlencode(params)}"
-    print(f"Requesting: {url}")
     
     try:
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read().decode())
-            # ساختار داده IODA شامل لیستی از نقاط داده است
+            
+            # --- اصلاح مهم: داده‌ها یک لیست هستند ---
             if data.get('data') and len(data['data']) > 0:
-                # آخرین نقطه داده موجود را برمی‌گردانیم
-                latest_point = data['data'][-1]
-                return latest_point.get('value')
+                # اولین آیتم لیست حاوی داده‌های منبع مورد نظر است
+                source_data = data['data'][0]
+                values_list = source_data.get('values', [])
+                
+                # پیدا کردن آخرین مقدار غیر Null در لیست
+                for val in reversed(values_list):
+                    if val is not None:
+                        return val
             return None
     except Exception as e:
         print(f"IODA Error ({source}): {e}")
@@ -59,12 +63,10 @@ def main():
     print("Starting Iran Internet Monitor (CF + IODA)...")
     cf_token = os.environ.get("CF_API_TOKEN")
     
-    # دریافت داده‌ها
     cf_data = get_cloudflare_data(cf_token)
     bgp_val = get_ioda_signal("bgp")
     ping_val = get_ioda_signal("ping-slash24")
 
-    # ساخت خروجی نهایی
     output = {
         "status": "Success" if cf_data else "Partial",
         "last_run": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
