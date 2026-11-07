@@ -79,7 +79,7 @@
 
     <div class="dashboard-card">
         <h1>پایش وضعیت اینترنت ایران 🇮🇷</h1>
-        <p class="subtitle">بر اساس داده‌های Cloudflare Radar</p>
+        <p class="subtitle">بر اساس داده‌های Cloudflare Radar و IODA</p>
 
         <div class="chart-container">
             <canvas id="trafficChart"></canvas>
@@ -89,7 +89,12 @@
             <p>سهم ترافیک وب (HTTP): <span id="http-val">-</span>٪</p>
             <p>سهم سایر ترافیک‌ها: <span id="other-val">-</span>٪</p>
             <p>آخرین به‌روزرسانی: <span id="last-updated">در حال دریافت...</span></p>
-            <div id="ioda-info"></div>
+            
+            <!-- بخش نمایش داده‌های IODA -->
+            <div id="ioda-info" style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px;">
+                <p style="color: #94a3b8; font-size: 12px;">در حال دریافت داده‌های IODA...</p>
+            </div>
+
             <div id="status-indicator" class="status-badge">در حال بارگذاری...</div>
         </div>
     </div>
@@ -104,23 +109,44 @@
                 
                 const data = await response.json();
                 
-                // به‌روزرسانی مقادیر در HTML
-                document.getElementById('http-val').innerText = parseFloat(data.http_traffic_percentage).toFixed(1);
-                document.getElementById('other-val').innerText = parseFloat(data.other_traffic_percentage).toFixed(1);
-                document.getElementById('last-updated').innerText = new Date(data.last_updated).toLocaleString('fa-IR');
+                // --- بخش Cloudflare ---
+                const httpVal = (data.cloudflare && data.cloudflare.http_percent) ? parseFloat(data.cloudflare.http_percent) : 0;
+                const otherVal = (data.cloudflare && data.cloudflare.other_percent) ? parseFloat(data.cloudflare.other_percent) : 0;
                 
-                // نمایش وضعیت
+                document.getElementById('http-val').innerText = httpVal.toFixed(1);
+                document.getElementById('other-val').innerText = otherVal.toFixed(1);
+                
+                if (data.last_run) {
+                    document.getElementById('last-updated').innerText = new Date(data.last_run).toLocaleString('fa-IR');
+                }
+                
+                // رسم نمودار
+                renderChart(httpVal, otherVal);
+
+                // --- بخش IODA ---
+                const iodaBox = document.getElementById('ioda-info');
+                if (data.ioda) {
+                    let bgpText = (data.ioda.bgp_value !== null && data.ioda.bgp_value !== "N/A") ? data.ioda.bgp_value : 'نامشخص';
+                    let pingText = (data.ioda.active_probing_value !== null && data.ioda.active_probing_value !== "N/A") ? data.ioda.active_probing_value : 'نامشخص';
+                    
+                    iodaBox.innerHTML = `
+                        <p style="margin-top:5px;">وضعیت IODA (۲۴ ساعت گذشته):</p>
+                        <p>BGP (مسیرهای شبکه): <span style="color:#fbbf24;">${bgpText}</span></p>
+                        <p>Active Probing (پاسخ‌دهی): <span style="color:#fbbf24;">${pingText}</span></p>
+                    `;
+                } else {
+                    iodaBox.innerHTML = '<p style="color: #f87171;">داده‌های IODA در دسترس نیست.</p>';
+                }
+                
+                // وضعیت اتصال
                 const statusEl = document.getElementById('status-indicator');
                 if(data.status === 'Success') {
                     statusEl.innerText = 'متصل (داده‌ها به‌روز هستند)';
                     statusEl.className = 'status-badge status-success';
                 } else {
-                    statusEl.innerText = 'خطا در دریافت داده';
+                    statusEl.innerText = 'هشدار: داده‌های ناقص';
                     statusEl.className = 'status-badge status-error';
                 }
-
-                // رسم نمودار با Chart.js
-                renderChart(data.http_traffic_percentage, data.other_traffic_percentage);
 
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -130,10 +156,11 @@
             }
         }
 
+        // تابع رسم نمودار دایره‌ای
         function renderChart(httpVal, otherVal) {
             const ctx = document.getElementById('trafficChart').getContext('2d');
             new Chart(ctx, {
-                type: 'doughnut', // نوع نمودار: دایره‌ای توخالی
+                type: 'doughnut',
                 data: {
                     labels: ['ترافیک وب (HTTP)', 'سایر ترافیک‌ها'],
                     datasets: [{
@@ -163,41 +190,7 @@
         }
 
         // اجرای تابع هنگام لود شدن صفحه
-       async function fetchData() {
-    try {
-        const response = await fetch('data.json?t=' + new Date().getTime());
-        if (!response.ok) throw new Error('Network response was not ok');
-        const data = await response.json();
-        
-        // --- بخش Cloudflare ---
-        if (data.cloudflare && !data.cloudflare.error) {
-            document.getElementById('http-val').innerText = parseFloat(data.cloudflare.http_percent).toFixed(1);
-            document.getElementById('other-val').innerText = parseFloat(data.cloudflare.other_percent).toFixed(1);
-            document.getElementById('last-updated').innerText = new Date(data.last_run).toLocaleString('fa-IR');
-            renderChart(data.cloudflare.http_percent, data.cloudflare.other_percent);
-        }
-
-        // --- بخش IODA ---
-        const iodaBox = document.getElementById('ioda-info');
-        if (data.ioda) {
-            let bgpText = data.ioda.bgp_value !== null ? data.ioda.bgp_value : 'نامشخص';
-            let pingText = data.ioda.active_probing_value !== null ? data.ioda.active_probing_value : 'نامشخص';
-            iodaBox.innerHTML = `
-                <p style="margin-top:10px; border-top:1px solid #334155; padding-top:10px;">وضعیت IODA (۲۴ ساعت گذشته):</p>
-                <p>BGP (مسیرهای شبکه): <span style="color:#fbbf24;">${bgpText}</span></p>
-                <p>Active Probing (پاسخ‌دهی): <span style="color:#fbbf24;">${pingText}</span></p>
-            `;
-        }
-        
-        const statusEl = document.getElementById('status-indicator');
-        statusEl.innerText = 'متصل (داده‌ها به‌روز هستند)';
-        statusEl.className = 'status-badge status-success';
-
-    } catch (error) {
-        console.error('Error fetching data:', error);
-        // ... (بقیه کدهای خطا)
-    }
-}
+        fetchData();
     </script>
 </body>
 </html>
