@@ -44,23 +44,19 @@ def get_ioda_signal(source):
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read().decode())
             
-            # چاپ ساختار داده برای دیباگ (در لاگ‌های گیت‌هاب خواهید دید)
-            print(f"DEBUG: Structure of {source}: {str(data)[:500]}...")
-            
             if data.get('data') and len(data['data']) > 0:
-                first_item = data['data'][0]
-                print(f"DEBUG: First item type: {type(first_item)}")
+                # آیتم اول یک لیست است که شامل همه منابع می‌شود
+                data_list = data['data'][0]
                 
-                # حالت اول: اگر داده‌ها مستقیماً یک لیست از اعداد باشند
-                if isinstance(first_item, list):
-                    for val in reversed(first_item):
-                        if val is not None:
-                            return val
-                # حالت دوم: اگر داده‌ها یک دیکشنری با کلید values باشند
-                elif isinstance(first_item, dict) and 'values' in first_item:
-                    for val in reversed(first_item['values']):
-                        if val is not None:
-                            return val
+                # لیست را می‌گردیم تا منبع مورد نظر را پیدا کنیم
+                for item in data_list:
+                    if isinstance(item, dict) and item.get('datasource') == source:
+                        # وقتی منبع را پیدا کردیم، آخرین مقدار معتبر را از لیست values برمی‌گردانیم
+                        if 'values' in item:
+                            values_list = item['values']
+                            for val in reversed(values_list):
+                                if val is not None:
+                                    return val
             return None
     except Exception as e:
         print(f"IODA Error ({source}): {e}")
@@ -72,7 +68,7 @@ def main():
     
     cf_data = get_cloudflare_data(cf_token)
     
-    # گرفتن داده‌های IODA با استفاده از منابع جدید
+    # دریافت داده‌ها با استفاده از منابع صحیح
     bgp_val = get_ioda_signal("bgp")
     ping_val = get_ioda_signal("ping-slash24")
 
