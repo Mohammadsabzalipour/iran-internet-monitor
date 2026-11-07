@@ -44,12 +44,21 @@ def get_ioda_signal(source):
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read().decode())
             
+            # چاپ ساختار داده برای دیباگ (در لاگ‌های گیت‌هاب خواهید دید)
+            print(f"DEBUG: Structure of {source}: {str(data)[:500]}...")
+            
             if data.get('data') and len(data['data']) > 0:
-                source_data = data['data'][0]
-                if isinstance(source_data, dict) and 'values' in source_data:
-                    values_list = source_data['values']
-                    # پیدا کردن آخرین مقدار معتبر (غیر Null)
-                    for val in reversed(values_list):
+                first_item = data['data'][0]
+                print(f"DEBUG: First item type: {type(first_item)}")
+                
+                # حالت اول: اگر داده‌ها مستقیماً یک لیست از اعداد باشند
+                if isinstance(first_item, list):
+                    for val in reversed(first_item):
+                        if val is not None:
+                            return val
+                # حالت دوم: اگر داده‌ها یک دیکشنری با کلید values باشند
+                elif isinstance(first_item, dict) and 'values' in first_item:
+                    for val in reversed(first_item['values']):
                         if val is not None:
                             return val
             return None
@@ -62,14 +71,15 @@ def main():
     cf_token = os.environ.get("CF_API_TOKEN")
     
     cf_data = get_cloudflare_data(cf_token)
+    
+    # گرفتن داده‌های IODA با استفاده از منابع جدید
     bgp_val = get_ioda_signal("bgp")
     ping_val = get_ioda_signal("ping-slash24")
 
-    # اگر داده‌ها Null بودند، به جای Null یک مقدار پیش‌فرض برای تست قرار می‌دهیم
     if bgp_val is None:
-        bgp_val = 0 # یا هر مقداری که نشان دهد خطا رخ داده
+        bgp_val = "N/A"
     if ping_val is None:
-        ping_val = 0
+        ping_val = "N/A"
 
     output = {
         "status": "Success" if cf_data else "Partial",
@@ -84,7 +94,7 @@ def main():
     with open('data.json', 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=4)
     print("Data saved to data.json")
-    print(f"BGP Value: {bgp_val}, Ping Value: {ping_val}")
+    print(f"Final Output: BGP={bgp_val}, Ping={ping_val}")
 
 if __name__ == "__main__":
     main()
