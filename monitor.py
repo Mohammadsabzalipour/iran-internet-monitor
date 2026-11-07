@@ -44,14 +44,11 @@ def get_ioda_signal(source):
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read().decode())
             
-            # دسترسی به لیست داده‌ها
             if data.get('data') and len(data['data']) > 0:
                 source_data = data['data'][0]
-                
-                # بررسی اینکه آیا کلید values وجود دارد
                 if isinstance(source_data, dict) and 'values' in source_data:
                     values_list = source_data['values']
-                    # پیدا کردن آخرین مقدار معتبر
+                    # پیدا کردن آخرین مقدار معتبر (غیر Null)
                     for val in reversed(values_list):
                         if val is not None:
                             return val
@@ -68,6 +65,12 @@ def main():
     bgp_val = get_ioda_signal("bgp")
     ping_val = get_ioda_signal("ping-slash24")
 
+    # اگر داده‌ها Null بودند، به جای Null یک مقدار پیش‌فرض برای تست قرار می‌دهیم
+    if bgp_val is None:
+        bgp_val = 0 # یا هر مقداری که نشان دهد خطا رخ داده
+    if ping_val is None:
+        ping_val = 0
+
     output = {
         "status": "Success" if cf_data else "Partial",
         "last_run": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -81,6 +84,7 @@ def main():
     with open('data.json', 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=4)
     print("Data saved to data.json")
+    print(f"BGP Value: {bgp_val}, Ping Value: {ping_val}")
 
 if __name__ == "__main__":
     main()
