@@ -1,0 +1,23 @@
+name: Iran Internet Monitor
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # اجرا هر ۳۰ دقیقه
+  workflow_dispatch:        # امکان اجرای دستی
+
+jobs:
+  check_status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Run monitor script
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: python monitor.py
