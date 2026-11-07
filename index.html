@@ -4,14 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>پایش وضعیت اینترنت ایران</title>
-    <!-- اضافه کردن فونت زیبای وزیرمتن -->
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
-    <!-- اضافه کردن کتابخانه Chart.js برای رسم نمودار -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: 'Vazirmatn', sans-serif;
-            background-color: #0f172a; /* رنگ پس‌زمینه تیره */
+            background-color: #0f172a;
             color: #e2e8f0;
             display: flex;
             justify-content: center;
@@ -30,22 +28,9 @@
             text-align: center;
             border: 1px solid #334155;
         }
-        h1 {
-            color: #38bdf8;
-            margin-bottom: 5px;
-            font-size: 24px;
-        }
-        .subtitle {
-            color: #94a3b8;
-            font-size: 14px;
-            margin-bottom: 25px;
-        }
-        .chart-container {
-            position: relative;
-            height: 250px;
-            width: 100%;
-            margin-bottom: 20px;
-        }
+        h1 { color: #38bdf8; margin-bottom: 5px; font-size: 24px; }
+        .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 25px; }
+        .chart-container { position: relative; height: 250px; width: 100%; margin-bottom: 20px; }
         .info-box {
             background-color: #0f172a;
             border-radius: 8px;
@@ -54,15 +39,8 @@
             text-align: right;
             border-right: 4px solid #38bdf8;
         }
-        .info-box p {
-            margin: 5px 0;
-            font-size: 14px;
-            color: #cbd5e1;
-        }
-        .info-box span {
-            color: #f8fafc;
-            font-weight: bold;
-        }
+        .info-box p { margin: 5px 0; font-size: 14px; color: #cbd5e1; }
+        .info-box span { color: #f8fafc; font-weight: bold; }
         .status-badge {
             display: inline-block;
             padding: 4px 12px;
@@ -73,6 +51,13 @@
         }
         .status-success { background-color: #065f46; color: #34d399; }
         .status-error { background-color: #7f1d1d; color: #f87171; }
+        
+        /* استایل‌های جدید برای هشدار IODA */
+        .ioda-item { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #334155; }
+        .ioda-item:last-child { border-bottom: none; }
+        .val-normal { color: #34d399; font-weight: bold; } /* سبز */
+        .val-warning { color: #f87171; font-weight: bold; } /* قرمز */
+        .val-detail { font-size: 11px; color: #64748b; display: block; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -90,7 +75,6 @@
             <p>سهم سایر ترافیک‌ها: <span id="other-val">-</span>٪</p>
             <p>آخرین به‌روزرسانی: <span id="last-updated">در حال دریافت...</span></p>
             
-            <!-- بخش نمایش داده‌های IODA -->
             <div id="ioda-info" style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px;">
                 <p style="color: #94a3b8; font-size: 12px;">در حال دریافت داده‌های IODA...</p>
             </div>
@@ -100,16 +84,14 @@
     </div>
 
     <script>
-        // تابع برای دریافت داده‌ها از فایل data.json
         async function fetchData() {
             try {
-                // برای اینکه فایل همیشه آخرین نسخه را بخواند، از هدر no-cache استفاده می‌کنیم
                 const response = await fetch('data.json?t=' + new Date().getTime());
                 if (!response.ok) throw new Error('Network response was not ok');
                 
                 const data = await response.json();
                 
-                // --- بخش Cloudflare ---
+                // --- Cloudflare ---
                 const httpVal = (data.cloudflare && data.cloudflare.http_percent) ? parseFloat(data.cloudflare.http_percent) : 0;
                 const otherVal = (data.cloudflare && data.cloudflare.other_percent) ? parseFloat(data.cloudflare.other_percent) : 0;
                 
@@ -120,43 +102,49 @@
                     document.getElementById('last-updated').innerText = new Date(data.last_run).toLocaleString('fa-IR');
                 }
                 
-                // رسم نمودار
                 renderChart(httpVal, otherVal);
 
-                // --- بخش IODA ---
+                // --- IODA (با سیستم هشدار) ---
                 const iodaBox = document.getElementById('ioda-info');
                 if (data.ioda) {
-                    let bgpText = (data.ioda.bgp_value !== null && data.ioda.bgp_value !== "N/A") ? data.ioda.bgp_value : 'نامشخص';
-                    let pingText = (data.ioda.active_probing_value !== null && data.ioda.active_probing_value !== "N/A") ? data.ioda.active_probing_value : 'نامشخص';
+                    let htmlContent = `<p style="margin-top:5px;">وضعیت IODA (۲۴ ساعت گذشته):</p>`;
                     
-                    iodaBox.innerHTML = `
-                        <p style="margin-top:5px;">وضعیت IODA (۲۴ ساعت گذشته):</p>
-                        <p>BGP (مسیرهای شبکه): <span style="color:#fbbf24;">${bgpText}</span></p>
-                        <p>Active Probing (پاسخ‌دهی): <span style="color:#fbbf24;">${pingText}</span></p>
-                    `;
+                    // تابع کمکی برای ساخت HTML هر آیتم
+                    const createIodaHtml = (label, item) => {
+                        if (!item || item.current === "N/A") return `<div class="ioda-item">${label}: نامشخص</div>`;
+                        
+                        const isWarning = item.status === "Warning";
+                        const colorClass = isWarning ? "val-warning" : "val-normal";
+                        const warningText = isWarning ? " (⚠️ افت شدید!)" : "";
+                        
+                        return `
+                            <div class="ioda-item">
+                                <span>${label}: <span class="${colorClass}">${item.current}</span>${warningText}</span>
+                                <span class="val-detail">میانگین ۲۴س: ${item.average} | افت: ${item.drop_percent}٪</span>
+                            </div>
+                        `;
+                    };
+
+                    htmlContent += createIodaHtml("BGP (مسیرها)", data.ioda.bgp);
+                    htmlContent += createIodaHtml("Active Probing", data.ioda.ping);
+                    
+                    iodaBox.innerHTML = htmlContent;
                 } else {
                     iodaBox.innerHTML = '<p style="color: #f87171;">داده‌های IODA در دسترس نیست.</p>';
                 }
                 
-                // وضعیت اتصال
+                // وضعیت کلی
                 const statusEl = document.getElementById('status-indicator');
-                if(data.status === 'Success') {
-                    statusEl.innerText = 'متصل (داده‌ها به‌روز هستند)';
-                    statusEl.className = 'status-badge status-success';
-                } else {
-                    statusEl.innerText = 'هشدار: داده‌های ناقص';
-                    statusEl.className = 'status-badge status-error';
-                }
+                statusEl.innerText = 'متصل (پایش فعال است)';
+                statusEl.className = 'status-badge status-success';
 
             } catch (error) {
                 console.error('Error fetching data:', error);
-                document.getElementById('status-indicator').innerText = 'عدم دسترسی به فایل داده‌ها';
+                document.getElementById('status-indicator').innerText = 'عدم دسترسی به داده‌ها';
                 document.getElementById('status-indicator').className = 'status-badge status-error';
-                document.getElementById('last-updated').innerText = 'نامشخص';
             }
         }
 
-        // تابع رسم نمودار دایره‌ای
         function renderChart(httpVal, otherVal) {
             const ctx = document.getElementById('trafficChart').getContext('2d');
             new Chart(ctx, {
@@ -165,10 +153,7 @@
                     labels: ['ترافیک وب (HTTP)', 'سایر ترافیک‌ها'],
                     datasets: [{
                         data: [httpVal, otherVal],
-                        backgroundColor: [
-                            '#38bdf8', // رنگ آبی برای HTTP
-                            '#475569'  // رنگ خاکستری برای بقیه
-                        ],
+                        backgroundColor: ['#38bdf8', '#475569'],
                         borderWidth: 0,
                         hoverOffset: 4
                     }]
@@ -176,20 +161,11 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                color: '#e2e8f0',
-                                font: { family: 'Vazirmatn' }
-                            }
-                        }
-                    }
+                    plugins: { legend: { position: 'bottom', labels: { color: '#e2e8f0', font: { family: 'Vazirmatn' } } } }
                 }
             });
         }
 
-        // اجرای تابع هنگام لود شدن صفحه
         fetchData();
     </script>
 </body>
