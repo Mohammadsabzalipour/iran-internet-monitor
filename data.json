@@ -1,7 +1,13 @@
 {
-    "last_updated": "2026-11-07T13:00:00Z",
-    "http_traffic_percentage": "63.387956",
-    "other_traffic_percentage": "36.612044",
-    "confidence_level": 5,
-    "status": "Success"
+    "status": "Success",
+    "last_run": "2026-11-07T15:10:16Z",
+    "cloudflare": {
+        "http_percent": "63.327742",
+        "other_percent": "36.672258",
+        "last_updated": "2026-11-07T13:30:00Z"
+    },
+    "ioda": {
+        "bgp_value": null,
+        "active_probing_value": null
+    }
 }
