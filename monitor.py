@@ -11,11 +11,10 @@ def check_cloudflare_traffic():
         print("Warning: Cloudflare API Token not found.")
         return
 
-    # استفاده از آدرس صحیح برای دریافت خلاصه ترافیک شبکه (NetFlows)
     base_url = "https://api.cloudflare.com/client/v4/radar/netflows/summary"
     params = {
         "location": "IR",
-        "dateRange": "7d",  # دریافت داده‌های ۷ روز گذشته
+        "dateRange": "7d",
         "format": "json"
     }
     
