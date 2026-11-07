@@ -44,16 +44,17 @@ def get_ioda_signal(source):
         with urllib.request.urlopen(url) as response:
             data = json.loads(response.read().decode())
             
-            # --- اصلاح مهم: داده‌ها یک لیست هستند ---
+            # دسترسی به لیست داده‌ها
             if data.get('data') and len(data['data']) > 0:
-                # اولین آیتم لیست حاوی داده‌های منبع مورد نظر است
                 source_data = data['data'][0]
-                values_list = source_data.get('values', [])
                 
-                # پیدا کردن آخرین مقدار غیر Null در لیست
-                for val in reversed(values_list):
-                    if val is not None:
-                        return val
+                # بررسی اینکه آیا کلید values وجود دارد
+                if isinstance(source_data, dict) and 'values' in source_data:
+                    values_list = source_data['values']
+                    # پیدا کردن آخرین مقدار معتبر
+                    for val in reversed(values_list):
+                        if val is not None:
+                            return val
             return None
     except Exception as e:
         print(f"IODA Error ({source}): {e}")
