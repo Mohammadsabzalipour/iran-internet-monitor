@@ -2,6 +2,7 @@ import urllib.request
 import urllib.parse
 import json
 import os
+from datetime import datetime
 
 def check_cloudflare_traffic():
     print("Starting Iran Internet Monitor...")
@@ -31,9 +32,33 @@ def check_cloudflare_traffic():
         with urllib.request.urlopen(req) as response:
             data = json.loads(response.read().decode())
             print("Successfully connected to Cloudflare Radar.")
-            print(f"Response success: {data.get('success')}")
-            if data.get('result'):
-                print(f"Sample result: {json.dumps(data['result'], indent=2)[:500]}...")
+            
+            # استخراج داده‌های مهم
+            result = data.get('result', {})
+            summary = result.get('summary_0', {})
+            meta = result.get('meta', {})
+            
+            http_percent = summary.get('HTTP', '0')
+            other_percent = summary.get('OTHER', '0')
+            last_updated = meta.get('lastUpdated', 'Unknown')
+            confidence = meta.get('confidenceInfo', {}).get('level', 'Unknown')
+
+            # ساخت دیکشنری خروجی
+            output_data = {
+                "last_updated": last_updated,
+                "http_traffic_percentage": http_percent,
+                "other_traffic_percentage": other_percent,
+                "confidence_level": confidence,
+                "status": "Success"
+            }
+
+            # ذخیره در فایل data.json
+            with open('data.json', 'w', encoding='utf-8') as f:
+                json.dump(output_data, f, indent=4)
+            
+            print("Data saved to data.json successfully.")
+            print(json.dumps(output_data, indent=2))
+
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
         print(f"HTTP Error {e.code}: {e.reason}")
