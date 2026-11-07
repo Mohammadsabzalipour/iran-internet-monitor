@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>پایش اینترنت ایران</title>
+<style>
+:root{--bg:#0b1220;--panel:#121d30;--panel2:#17243a;--text:#e8eef8;--muted:#9aabc3;--line:#263751;--green:#25c28a;--yellow:#f2b84b;--red:#f06a73;--blue:#65a9ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(140deg,#0b1220,#101b2c);color:var(--text);font-family:Tahoma,Arial,sans-serif}
+main{max-width:1150px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+h1{font-size:25px;margin:0 0 8px}.sub{color:var(--muted);font-size:13px}.pill{border:1px solid var(--line);background:#17243a;padding:8px 12px;border-radius:30px;font-size:12px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}
+.card,.panel{background:rgba(18,29,48,.96);border:1px solid var(--line);border-radius:16px;padding:16px}
+.metric{font-size:12px;color:var(--muted)}.value{font-size:22px;font-weight:bold;margin:10px 0 5px}.desc{font-size:11px;color:var(--muted)}
+.status{display:flex;align-items:center;gap:12px}.dot{width:12px;height:12px;border-radius:50%;background:var(--yellow);box-shadow:0 0 14px currentColor}
+.status strong{font-size:20px}.statusline{font-size:12px;color:var(--muted);margin-top:6px}
+.layout{display:grid;grid-template-columns:1.4fr 1fr;gap:12px}.panel h2{font-size:16px;margin:0 0 12px}
+canvas{width:100%;height:210px;display:block;background:#0d1727;border-radius:10px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}.row:last-child{border:0}
+button,a.btn{border:0;background:#2b75d6;color:white;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:bold;cursor:pointer;font-size:12px}
+button.secondary,a.secondary{background:#24344d;color:var(--text);border:1px solid var(--line)}
+input{width:100%;background:#0d1727;color:var(--text);border:1px solid var(--line);padding:11px;border-radius:9px;direction:ltr}
+label{display:block;font-size:12px;color:var(--muted);margin:12px 0 6px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.small{font-size:11px;color:var(--muted);line-height:1.8}
+.warn{border-right:3px solid var(--yellow);padding:10px 12px;background:#211f1a;border-radius:8px;font-size:12px;line-height:1.9;color:#e9d7ae;margin-top:12px}
+.good{color:var(--green)}.bad{color:var(--red)}.warnc{color:var(--yellow)}
+.links{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+footer{color:var(--muted);font-size:11px;line-height:1.9;margin:18px 0}
+@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}main{padding:14px}}
+</style></head>
+<body><main>
+<div class="top"><div><h1>پایش اینترنت ایران 🇮🇷</h1><div class="sub">IODA زنده · Cloudflare Radar · OONI · به‌روزرسانی خودکار هر ۵ دقیقه</div></div><div class="pill" id="lastUpdate">هنوز داده‌ای دریافت نشده</div></div>
+<section class="card" style="margin-top:18px">
+ <div class="status"><span class="dot" id="statusDot"></span><div><strong id="overall">در انتظار دریافت داده</strong><div class="statusline" id="statusText">برای شروع، دکمه «بررسی اکنون» را بزنید.</div></div></div>
+ <div class="actions"><button id="refresh">بررسی اکنون</button><button class="secondary" id="toggle">توقف به‌روزرسانی خودکار</button><span class="pill" id="autoState">پایش خودکار فعال · ۵ دقیقه</span></div>
+</section>
+<div class="grid">
+ <div class="card"><div class="metric">BGP · مسیرهای قابل مشاهده</div><div class="value" id="bgpVal">—</div><div class="desc" id="bgpDesc">داده IODA هنوز دریافت نشده</div></div>
+ <div class="card"><div class="metric">Active Probing · دسترسی شبکه</div><div class="value" id="pingVal">—</div><div class="desc" id="pingDesc">داده IODA هنوز دریافت نشده</div></div>
+ <div class="card"><div class="metric">رخدادهای اختلال IODA</div><div class="value" id="outageVal">—</div><div class="desc" id="outageDesc">در بازه ۲۴ ساعت گذشته</div></div>
+ <div class="card"><div class="metric">Cloudflare Radar</div><div class="value" id="cfVal">نیازمند توکن</div><div class="desc">API رسمی Cloudflare به توکن Read نیاز دارد</div></div>
+</div>
+<div class="layout">
+ <section class="panel"><h2>سیگنال‌های IODA در ۲۴ ساعت گذشته</h2><canvas id="chart" width="900" height="260"></canvas><div class="small" id="chartNote">پس از دریافت داده، روند سیگنال‌ها در این نمودار نمایش داده می‌شود.</div></section>
+ <section class="panel"><h2>وضعیت منابع و تفسیر</h2><div class="row"><span>IODA API</span><b id="iodaState" class="warnc">در انتظار</b></div><div class="row"><span>Cloudflare Radar API</span><b id="cfState" class="warnc">توکن وارد نشده</b></div><div class="row"><span>OONI Explorer</span><b>لینک منبع</b></div><div class="row"><span>NetBlocks</span><b>گزارش‌های عمومی</b></div><div class="warn">این داشبورد ابزار کمکی است. افت یک سیگنال به‌تنهایی اثبات قطعی سراسری یا عمدی بودن محدودیت نیست. هم‌زمانی افت BGP و probing و ترافیک وب، شواهد قوی‌تری ایجاد می‌کند.</div></section>
+</div>
+<section class="panel" style="margin-top:12px"><h2>اتصال اختیاری Cloudflare Radar</h2>
+ <div class="small">برای دریافت شاخص‌های رسمی Cloudflare API، یک API Token با مجوز Account → Radar → Read بسازید. توکن فقط در همین مرورگر و در حافظه این صفحه استفاده می‌شود و به هیچ سرور واسطه‌ای ارسال نمی‌شود.</div>
+ <label for="token">Cloudflare API Token</label><input id="token" type="password" placeholder="توکن را اینجا وارد کنید">
+ <div class="actions"><button id="saveToken">استفاده از توکن</button><button class="secondary" id="clearToken">پاک کردن توکن</button><a class="btn secondary" href="https://developers.cloudflare.com/radar/get-started/first-request/" target="_blank" rel="noopener">راهنمای ساخت توکن</a></div>
+ <div class="small" id="cfMsg">بدون توکن، لینک مستقیم داشبورد Cloudflare در دسترس است اما داده API در این صفحه بارگذاری نمی‌شود.</div>
+</section>
+<section class="panel" style="margin-top:12px"><h2>منابع برای بررسی متقابل</h2><div class="links">
+<a class="btn" href="https://ioda.inetintel.cc.gatech.edu/country/IR" target="_blank" rel="noopener">IODA ایران</a>
+<a class="btn" href="https://radar.cloudflare.com/traffic/ir" target="_blank" rel="noopener">Cloudflare Radar</a>
+<a class="btn" href="https://explorer.ooni.org/country/IR" target="_blank" rel="noopener">OONI ایران</a>
+<a class="btn" href="https://netblocks.org/" target="_blank" rel="noopener">NetBlocks</a>
+<a class="btn" href="https://pulse.internetsociety.org/shutdowns" target="_blank" rel="noopener">Internet Society Pulse</a>
+</div></section>
+<footer>منابع داده: IODA API v2 و Cloudflare Radar API. داده‌های IODA ممکن است با تأخیر منتشر شوند. ترافیک Cloudflare فقط بخشی از ترافیک وب مشاهده‌شده در شبکه Cloudflare را پوشش می‌دهد. این صفحه به‌صورت محلی در مرورگر اجرا می‌شود؛ برای دریافت APIها باید اینترنت و دسترسی مرورگر به API برقرار باشد.</footer>
+</main>
+<script>
+const API='https://api.ioda.inetintel.cc.gatech.edu/v2';
+let timer=null,auto=true,series=[];
+const $=id=>document.getElementById(id);
+function setStatus(title,desc,level='warnc'){ $('overall').textContent=title;$('statusText').textContent=desc;$('statusDot').style.background=level==='bad'?'#f06a73':level==='good'?'#25c28a':'#f2b84b';$('statusDot').style.color=$('statusDot').style.background;}
+function fmt(v){if(v===null||v===undefined||!Number.isFinite(Number(v)))return '—';return Number(v).toLocaleString('fa-IR',{maximumFractionDigits:2});}
+function extractSignals(json){
+ let arr=json?.data??json?.result??json;
+ if(!Array.isArray(arr)){if(arr&&typeof arr==='object')arr=Object.values(arr);}
+ if(!Array.isArray(arr))return [];
+ return arr.map(x=>({source:x.datasource||x.source||x.name||'unknown',values:x.values||x.data?.values||[],from:x.from,step:x.step||x.nativeStep||60})).filter(x=>Array.isArray(x.values)&&x.values.length);
+}
+function latest(s){let vals=s.values.map(Number).filter(Number.isFinite);return vals.length?vals[vals.length-1]:null;}
+function draw(){
+ const c=$('chart'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#263751';ctx.lineWidth=1;
+ for(let i=0;i<5;i++){let y=20+i*(h-40)/4;ctx.beginPath();ctx.moveTo(45,y);ctx.lineTo(w-12,y);ctx.stroke();}
+ if(!series.length){ctx.fillStyle='#9aabc3';ctx.font='16px Tahoma';ctx.fillText('در انتظار داده سیگنال IODA',60,130);return;}
+ const colors=['#65a9ff','#25c28a','#f2b84b','#c28cff'];
+ series.slice(0,4).forEach((s,j)=>{let vals=s.values.map(Number),good=vals.filter(Number.isFinite);if(!good.length)return;let min=Math.min(...good),max=Math.max(...good);if(max===min)max=min+1;ctx.strokeStyle=colors[j];ctx.lineWidth=2;ctx.beginPath();let started=false;vals.forEach((v,i)=>{if(!Number.isFinite(v))return;let x=45+i*(w-65)/Math.max(1,vals.length-1),y=h-20-((v-min)/(max-min))*(h-45);if(!started){ctx.moveTo(x,y);started=true}else ctx.lineTo(x,y)});ctx.stroke();ctx.fillStyle=colors[j];ctx.font='12px Tahoma';ctx.fillText(s.source,55+j*175,15);});
+}
+async function getJson(url,headers={}){const r=await fetch(url,{headers,cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}
+async function loadIoda(){
+ const until=Math.floor(Date.now()/1000),from=until-86400;
+ const url=`${API}/signals/raw/country/IR?from=${from}&until=${until}`;
+ const data=await getJson(url);series=extractSignals(data);
+ if(!series.length)throw new Error('ساختار پاسخ سیگنال قابل تشخیص نبود');
+ const bgp=series.find(s=>/bgp/i.test(s.source)),ping=series.find(s=>/ping|probe/i.test(s.source));
+ if(bgp){$('bgpVal').textContent=fmt(latest(bgp));$('bgpDesc').textContent='آخرین مقدار سیگنال؛ برای تفسیر باید با خط مبنا مقایسه شود';}
+ if(ping){$('pingVal').textContent=fmt(latest(ping));$('pingDesc').textContent='آخرین مقدار سیگنال؛ مقدار بالاتر/پایین‌تر بسته به تعریف منبع است';}
+ $('iodaState').textContent='دریافت شد';$('iodaState').className='good';draw();
+ // outage endpoint can differ by API deployment; attempt the documented v2 route
+ try{
+  const ev=await getJson(`${API}/outages/events?entityType=country&entityCode=IR&from=${from}&until=${until}`);
+  const events=ev?.data??ev?.events??[];
+  $('outageVal').textContent=fmt(Array.isArray(events)?events.length:0);
+  $('outageDesc').textContent='رخدادهای برگشتی API در ۲۴ ساعت گذشته';
+ }catch(e){$('outageVal').textContent='—';$('outageDesc').textContent='دریافت رخدادها از این endpoint ممکن نشد';}
+ return true;
+}
+async function loadCloudflare(){
+ const token=$('token').value.trim();if(!token){$('cfState').textContent='توکن وارد نشده';$('cfState').className='warnc';return;}
+ // Country-specific summary endpoint; if the account token is valid, this confirms Radar API access.
+ const url='https://api.cloudflare.com/client/v4/radar/http/summary/device_type?location=IR&dateRange=1d&format=json';
+ try{const d=await getJson(url,{Authorization:'Bearer '+token});if(!d.success)throw new Error('Cloudflare API returned an error');const x=d.result?.summary_0||{};$('cfVal').textContent=(x.mobile!==undefined?fmt(x.mobile)+'% موبایل':'دریافت شد');$('cfState').textContent='متصل';$('cfState').className='good';$('cfMsg').textContent='اتصال Cloudflare برقرار است. این endpoint توزیع دستگاه‌ها را برمی‌گرداند، نه کل حجم ترافیک.';}
+ catch(e){$('cfState').textContent='خطا در دریافت';$('cfState').className='bad';$('cfMsg').textContent='توکن، مجوز Radar Read یا دسترسی شبکه را بررسی کنید: '+e.message;}
+}
+async function refresh(){
+ $('lastUpdate').textContent='در حال دریافت…';
+ let ok=false;try{await loadIoda();ok=true;}catch(e){$('iodaState').textContent='خطا: '+e.message;$('iodaState').className='bad';}
+ await loadCloudflare();
+ $('lastUpdate').textContent='آخرین بررسی: '+new Date().toLocaleString('fa-IR');
+ if(ok){setStatus('داده IODA دریافت شد','سیگنال‌ها را با خط مبنای تاریخی و منابع دیگر مقایسه کنید.','good');}
+ else{setStatus('دریافت داده ناموفق بود','اتصال اینترنت، CORS یا دسترس‌پذیری API را بررسی کنید.','warnc');}
+}
+function start(){if(timer)clearInterval(timer);timer=setInterval(()=>{if(auto)refresh()},300000);}
+$('refresh').onclick=refresh;
+$('toggle').onclick=()=>{auto=!auto;$('toggle').textContent=auto?'توقف به‌روزرسانی خودکار':'فعال‌کردن به‌روزرسانی خودکار';$('autoState').textContent=auto?'پایش خودکار فعال · ۵ دقیقه':'پایش خودکار متوقف است';};
+$('saveToken').onclick=()=>{sessionStorage.setItem('cfRadarToken',$('token').value.trim());$('cfMsg').textContent='توکن در حافظه نشست همین مرورگر ذخیره شد.';refresh();};
+$('clearToken').onclick=()=>{$('token').value='';sessionStorage.removeItem('cfRadarToken');$('cfVal').textContent='نیازمند توکن';$('cfState').textContent='توکن وارد نشده';$('cfState').className='warnc';};
+$('token').value=sessionStorage.getItem('cfRadarToken')||'';
+draw();refresh();start();
+</script></body></html>
