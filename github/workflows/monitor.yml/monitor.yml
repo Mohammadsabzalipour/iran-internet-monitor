@@ -1,0 +1,17 @@
+name: Iran Internet Monitor
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check_status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run monitor script
+        run: |
+          echo "Checking internet status..."
