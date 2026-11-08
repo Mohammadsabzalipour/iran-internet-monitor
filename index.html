@@ -1,15 +1,211 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پایش وضعیت اینترنت ایران</title>
+    <!-- فونت وزیرمتن -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    <!-- کتابخانه Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .dashboard-card {
+            background-color: #1e293b;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 650px;
+            text-align: center;
+            border: 1px solid #334155;
+        }
+        h1 { color: #38bdf8; margin-bottom: 5px; font-size: 24px; }
+        .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 25px; }
+        
+        .chart-container { position: relative; height: 200px; width: 100%; margin-bottom: 20px; }
+        
+        .line-chart-container {
+            background-color: #0f172a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            border-right: 4px solid #38bdf8;
+        }
+        .line-chart-container h3 { margin: 0 0 10px 0; font-size: 15px; color: #cbd5e1; text-align: right; }
+
+        .info-box {
+            background-color: #0f172a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            text-align: right;
+            border-right: 4px solid #38bdf8;
+        }
+        .info-box p { margin: 5px 0; font-size: 14px; color: #cbd5e1; }
+        .info-box span { color: #f8fafc; font-weight: bold; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .status-success { background-color: #065f46; color: #34d399; }
+        .status-error { background-color: #7f1d1d; color: #f87171; }
+        
+        .ioda-item { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #334155; }
+        .ioda-item:last-child { border-bottom: none; }
+        .val-normal { color: #34d399; font-weight: bold; }
+        .val-warning { color: #f87171; font-weight: bold; }
+        .val-detail { font-size: 11px; color: #64748b; display: block; margin-top: 2px; }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-card">
+        <h1>پایش وضعیت اینترنت ایران 🇮🇷</h1>
+        <p class="subtitle">بر اساس داده‌های Cloudflare Radar و IODA</p>
+
+        <div class="chart-container">
+            <canvas id="trafficChart"></canvas>
+        </div>
+
+        <div class="info-box">
+            <p>سهم ترافیک وب (HTTP): <span id="http-val">-</span>٪</p>
+            <p>سهم سایر ترافیک‌ها: <span id="other-val">-</span>٪</p>
+            <p>آخرین به‌روزرسانی: <span id="last-updated">در حال دریافت...</span></p>
+            
+            <div id="ioda-info" style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px;">
+                <p style="color: #94a3b8; font-size: 12px;">در حال دریافت داده‌های IODA...</p>
+            </div>
+
+            <div id="status-indicator" class="status-badge">در حال بارگذاری...</div>
+        </div>
+
+        <!-- نمودارهای خطی -->
+        <div class="line-chart-container">
+            <h3>روند ۲۴ ساعته BGP (مسیرهای شبکه)</h3>
+            <div style="position: relative; height: 140px; width: 100%;">
+                <canvas id="bgpChart"></canvas>
+            </div>
+        </div>
+
+        <div class="line-chart-container">
+            <h3>روند ۲۴ ساعته Active Probing (پاسخ‌دهی)</h3>
+            <div style="position: relative; height: 140px; width: 100%;">
+                <canvas id="pingChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchData() {
+            try {
+                const response = await fetch('data.json?t=' + new Date().getTime());
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const data = await response.json();
+                
+                // بخش Cloudflare
+                const httpVal = (data.cloudflare && data.cloudflare.http_percent) ? parseFloat(data.cloudflare.http_percent) : 0;
+                const otherVal = (data.cloudflare && data.cloudflare.other_percent) ? parseFloat(data.cloudflare.other_percent) : 0;
+                
+                document.getElementById('http-val').innerText = httpVal.toFixed(1);
+                document.getElementById('other-val').innerText = otherVal.toFixed(1);
+                
+                if (data.last_run) {
+                    document.getElementById('last-updated').innerText = new Date(data.last_run).toLocaleString('fa-IR');
+                }
+                
+                renderDoughnutChart(httpVal, otherVal);
+
+                // بخش IODA
+                const iodaBox = document.getElementById('ioda-info');
+                if (data.ioda) {
+                    let htmlContent = `<p style="margin-top:5px;">وضعیت IODA (۲۴ ساعت گذشته):</p>`;
+                    
+                    const createIodaHtml = (label, item) => {
+                        if (!item || item.current === "N/A") return `<div class="ioda-item">${label}: نامشخص</div>`;
+                        const isWarning = item.status === "Warning";
+                        const colorClass = isWarning ? "val-warning" : "val-normal";
+                        const warningText = isWarning ? " (⚠️ افت شدید!)" : "";
+                        return `
+                            <div class="ioda-item">
+                                <span>${label}: <span class="${colorClass}">${item.current}</span>${warningText}</span>
+                                <span class="val-detail">میانگین ۲۴س: ${item.average} | افت: ${item.drop_percent}٪</span>
+                            </div>
+                        `;
+                    };
+
+                    htmlContent += createIodaHtml("BGP (مسیرها)", data.ioda.bgp);
+                    htmlContent += createIodaHtml("Active Probing", data.ioda.ping);
+                    iodaBox.innerHTML = htmlContent;
+
+                    // رسم نمودارهای خطی با ساعت
+                    if(data.ioda.bgp && data.ioda.bgp.chart_data) {
+                        renderLineChart('bgpChart', data.ioda.bgp.chart_data, '#34d399');
+                    }
+                    if(data.ioda.ping && data.ioda.ping.chart_data) {
+                        renderLineChart('pingChart', data.ioda.ping.chart_data, '#38bdf8');
+                    }
+                } else {
+                    iodaBox.innerHTML = '<p style="color: #f87171;">داده‌های IODA در دسترس نیست.</p>';
+                }
+                
+                const statusEl = document.getElementById('status-indicator');
+                statusEl.innerText = 'متصل (پایش فعال است)';
+                statusEl.className = 'status-badge status-success';
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('status-indicator').innerText = 'عدم دسترسی به داده‌ها';
+                document.getElementById('status-indicator').className = 'status-badge status-error';
+            }
+        }
+
+        function renderDoughnutChart(httpVal, otherVal) {
+            const ctx = document.getElementById('trafficChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['ترافیک وب (HTTP)', 'سایر ترافیک‌ها'],
+                    datasets: [{
+                        data: [httpVal, otherVal],
+                        backgroundColor: ['#38bdf8', '#475569'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#e2e8f0', font: { family: 'Vazirmatn' } } } }
+                }
+            });
+        }
+
         function renderLineChart(canvasId, dataArray, lineColor) {
             const ctx = document.getElementById(canvasId).getContext('2d');
             
-            // محاسبه زمان شروع (۲۴ ساعت پیش) و ساخت لیبل‌های زمانی دقیق
+            // محاسبه ساعت‌ها برای محور X
             const now = new Date();
-            const startTime = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+            const startTime = new Date(now.getTime() - (24 * 60 * 60 * 1000)); // ۲۴ ساعت پیش
             const totalPoints = dataArray.length;
             
             const labels = dataArray.map((_, i) => {
-                // محاسبه زمان برای هر نقطه بر اساس فاصله زمانی
                 const pointTime = new Date(startTime.getTime() + (i * (24 * 60 * 60 * 1000 / totalPoints)));
-                // فرمت ساعت به صورت "ساعت:دقیقه"
                 const hh = pointTime.getHours().toString().padStart(2, '0');
                 const mm = pointTime.getMinutes().toString().padStart(2, '0');
                 return `${hh}:${mm}`;
@@ -20,14 +216,13 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: canvasId === 'bgpChart' ? 'BGP' : 'Ping',
                         data: dataArray,
                         borderColor: lineColor,
                         backgroundColor: lineColor + '22',
                         borderWidth: 2,
                         fill: true,
-                        pointRadius: 0, // نقطه‌ها را مخفی نگه می‌داریم
-                        pointHoverRadius: 5, // وقتی موس روی خط رفت، نقطه نمایش داده شود
+                        pointRadius: 0,
+                        pointHoverRadius: 5,
                         pointHoverBackgroundColor: lineColor,
                         tension: 0.4
                     }]
@@ -37,7 +232,7 @@
                     maintainAspectRatio: false,
                     interaction: {
                         mode: 'index',
-                        intersect: false, // باعث می‌شود حتی با نزدیک شدن به خط، تولتیپ باز شود
+                        intersect: false,
                     },
                     plugins: {
                         legend: { display: false },
@@ -48,9 +243,8 @@
                             borderColor: '#334155',
                             borderWidth: 1,
                             padding: 10,
-                            displayColors: false, // حذف مربع رنگی کنار متن
+                            displayColors: false,
                             callbacks: {
-                                // شخصی‌سازی متن تولتیپ
                                 label: function(context) {
                                     return 'مقدار: ' + context.parsed.y;
                                 },
@@ -62,20 +256,26 @@
                     },
                     scales: {
                         x: { 
-                            display: true, // محور افقی را نمایش بده
-                            grid: { color: '#334155', drawBorder: false },
+                            display: true,
+                            grid: { color: '#1e293b', drawBorder: false },
                             ticks: { 
                                 color: '#94a3b8', 
                                 font: {size: 10, family: 'Vazirmatn'},
-                                maxTicksLimit: 6 // فقط ۶ ساعت مختلف را نشان بده تا شلوغ نشود
+                                maxTicksLimit: 5 
                             } 
                         },
                         y: { 
                             display: true, 
-                            grid: { color: '#334155' }, 
+                            grid: { color: '#1e293b' }, 
                             ticks: { color: '#94a3b8', font: {size: 10} } 
                         }
                     }
                 }
             });
         }
+
+        fetchData();
+        setInterval(fetchData, 30 * 60 * 1000); // هر ۳۰ دقیقه رفرش می‌کند
+    </script>
+</body>
+</html>
