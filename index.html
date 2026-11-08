@@ -24,13 +24,23 @@
             padding: 30px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
             width: 100%;
-            max-width: 500px;
+            max-width: 600px; /* کمی پهن‌تر شد */
             text-align: center;
             border: 1px solid #334155;
         }
         h1 { color: #38bdf8; margin-bottom: 5px; font-size: 24px; }
         .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 25px; }
-        .chart-container { position: relative; height: 250px; width: 100%; margin-bottom: 20px; }
+        .chart-container { position: relative; height: 200px; width: 100%; margin-bottom: 20px; }
+        
+        .line-chart-container {
+            background-color: #0f172a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            border-right: 4px solid #38bdf8;
+        }
+        .line-chart-container h3 { margin: 0 0 10px 0; font-size: 16px; color: #cbd5e1; text-align: right; }
+
         .info-box {
             background-color: #0f172a;
             border-radius: 8px;
@@ -52,11 +62,10 @@
         .status-success { background-color: #065f46; color: #34d399; }
         .status-error { background-color: #7f1d1d; color: #f87171; }
         
-        /* استایل‌های جدید برای هشدار IODA */
         .ioda-item { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #334155; }
         .ioda-item:last-child { border-bottom: none; }
-        .val-normal { color: #34d399; font-weight: bold; } /* سبز */
-        .val-warning { color: #f87171; font-weight: bold; } /* قرمز */
+        .val-normal { color: #34d399; font-weight: bold; }
+        .val-warning { color: #f87171; font-weight: bold; }
         .val-detail { font-size: 11px; color: #64748b; display: block; margin-top: 2px; }
     </style>
 </head>
@@ -81,17 +90,33 @@
 
             <div id="status-indicator" class="status-badge">در حال بارگذاری...</div>
         </div>
+
+        <!-- نمودارهای خطی جدید -->
+        <div class="line-chart-container">
+            <h3>روند ۲۴ ساعته BGP (مسیرهای شبکه)</h3>
+            <div style="position: relative; height: 120px; width: 100%;">
+                <canvas id="bgpChart"></canvas>
+            </div>
+        </div>
+
+        <div class="line-chart-container">
+            <h3>روند ۲۴ ساعته Active Probing (پاسخ‌دهی)</h3>
+            <div style="position: relative; height: 120px; width: 100%;">
+                <canvas id="pingChart"></canvas>
+            </div>
+        </div>
     </div>
 
     <script>
         async function fetchData() {
             try {
+                // کش را دور می‌زنیم
                 const response = await fetch('data.json?t=' + new Date().getTime());
                 if (!response.ok) throw new Error('Network response was not ok');
                 
                 const data = await response.json();
                 
-                // --- Cloudflare ---
+                // Cloudflare
                 const httpVal = (data.cloudflare && data.cloudflare.http_percent) ? parseFloat(data.cloudflare.http_percent) : 0;
                 const otherVal = (data.cloudflare && data.cloudflare.other_percent) ? parseFloat(data.cloudflare.other_percent) : 0;
                 
@@ -102,21 +127,18 @@
                     document.getElementById('last-updated').innerText = new Date(data.last_run).toLocaleString('fa-IR');
                 }
                 
-                renderChart(httpVal, otherVal);
+                renderDoughnutChart(httpVal, otherVal);
 
-                // --- IODA (با سیستم هشدار) ---
+                // IODA
                 const iodaBox = document.getElementById('ioda-info');
                 if (data.ioda) {
                     let htmlContent = `<p style="margin-top:5px;">وضعیت IODA (۲۴ ساعت گذشته):</p>`;
                     
-                    // تابع کمکی برای ساخت HTML هر آیتم
                     const createIodaHtml = (label, item) => {
                         if (!item || item.current === "N/A") return `<div class="ioda-item">${label}: نامشخص</div>`;
-                        
                         const isWarning = item.status === "Warning";
                         const colorClass = isWarning ? "val-warning" : "val-normal";
                         const warningText = isWarning ? " (⚠️ افت شدید!)" : "";
-                        
                         return `
                             <div class="ioda-item">
                                 <span>${label}: <span class="${colorClass}">${item.current}</span>${warningText}</span>
@@ -127,13 +149,19 @@
 
                     htmlContent += createIodaHtml("BGP (مسیرها)", data.ioda.bgp);
                     htmlContent += createIodaHtml("Active Probing", data.ioda.ping);
-                    
                     iodaBox.innerHTML = htmlContent;
+
+                    // رسم نمودارهای خطی
+                    if(data.ioda.bgp && data.ioda.bgp.chart_data) {
+                        renderLineChart('bgpChart', data.ioda.bgp.chart_data, '#34d399');
+                    }
+                    if(data.ioda.ping && data.ioda.ping.chart_data) {
+                        renderLineChart('pingChart', data.ioda.ping.chart_data, '#38bdf8');
+                    }
                 } else {
                     iodaBox.innerHTML = '<p style="color: #f87171;">داده‌های IODA در دسترس نیست.</p>';
                 }
                 
-                // وضعیت کلی
                 const statusEl = document.getElementById('status-indicator');
                 statusEl.innerText = 'متصل (پایش فعال است)';
                 statusEl.className = 'status-badge status-success';
@@ -145,7 +173,7 @@
             }
         }
 
-        function renderChart(httpVal, otherVal) {
+        function renderDoughnutChart(httpVal, otherVal) {
             const ctx = document.getElementById('trafficChart').getContext('2d');
             new Chart(ctx, {
                 type: 'doughnut',
@@ -166,7 +194,50 @@
             });
         }
 
+        function renderLineChart(canvasId, dataArray, lineColor) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            // ساخت لیست لیبل‌ها (۲۴ ساعت پیش تا الان)
+            const labels = dataArray.map((_, i) => {
+                const d = new Date();
+                d.setMinutes(d.getMinutes() - ((dataArray.length - 1 - i) * 10));
+                return d.getHours() + ':' + d.getMinutes().toString().padStart(2, '0');
+            });
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataArray,
+                        borderColor: lineColor,
+                        backgroundColor: lineColor + '22', // رنگ شفاف برای زیر نمودار
+                        borderWidth: 2,
+                        fill: true,
+                        pointRadius: 0, // مخفی کردن نقطه‌ها برای زیبایی
+                        tension: 0.4 // انحنای خط
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }, // مخفی کردن راهنمای بالا
+                    scales: {
+                        x: { display: false }, // مخفی کردن محور افقی
+                        y: { 
+                            display: true, 
+                            grid: { color: '#334155' }, 
+                            ticks: { color: '#94a3b8', font: {size: 10} } 
+                        }
+                    }
+                }
+            });
+        }
+
+        // بارگذاری اولیه
         fetchData();
+        
+        // به‌روزرسانی خودکار هر ۳۰ دقیقه
+        setInterval(fetchData, 30 * 60 * 1000);
     </script>
 </body>
 </html>
