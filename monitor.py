@@ -5,7 +5,6 @@ import os
 import time
 
 def get_cloudflare_data(token):
-    print("--- Checking Cloudflare ---")
     if not token:
         return None
     base_url = "https://api.cloudflare.com/client/v4/radar/netflows/summary"
@@ -22,14 +21,12 @@ def get_cloudflare_data(token):
                 "other_percent": summary.get('OTHER', '0'),
                 "last_updated": data.get('result', {}).get('meta', {}).get('lastUpdated')
             }
-    except Exception as e:
-        print(f"Cloudflare Error: {e}")
+    except Exception:
         return None
 
 def get_ioda_signal(source):
-    print(f"--- Checking IODA: {source} ---")
     until = int(time.time())
-    from_time = until - (24 * 60 * 60) # 24 ساعت گذشته
+    from_time = until - (24 * 60 * 60)
     
     base_url = "https://api.ioda.inetintel.cc.gatech.edu/v2/signals/raw/country/IR"
     params = {"from": from_time, "until": until, "source": source}
@@ -41,32 +38,35 @@ def get_ioda_signal(source):
             if data.get('data') and len(data['data']) > 0:
                 for item in data['data'][0]:
                     if isinstance(item, dict) and item.get('datasource') == source:
-                        values = [v for v in item.get('values', []) if v is not None]
+                        # استخراج لیست کامل مقادیر (بدون مقادیر None)
+                        raw_values = item.get('values', [])
+                        values = [v for v in raw_values if v is not None]
                         if values:
-                            current_val = values[-1] # آخرین مقدار
-                            avg_val = sum(values) / len(values) # میانگین ۲۴ ساعت
+                            current_val = values[-1]
+                            avg_val = sum(values) / len(values)
                             
-                            # محاسبه درصد افت
+                            # ذخیره داده‌های نمودار (حداکثر ۵۰ نقطه برای جلوگیری از سنگین شدن)
+                            step = max(1, len(values) // 50)
+                            chart_data = values[::step]
+                            
                             drop_percent = 0
                             if avg_val > 0:
                                 drop_percent = ((avg_val - current_val) / avg_val) * 100
                             
-                            # اگر افت بیش از ۲۰ درصد بود، هشدار بده
                             status = "Warning" if drop_percent > 20 else "Normal"
                             
                             return {
                                 "current": current_val,
                                 "average": int(avg_val),
                                 "drop_percent": round(drop_percent, 1),
-                                "status": status
+                                "status": status,
+                                "chart_data": chart_data # این لیست به HTML فرستاده می‌شود
                             }
             return None
-    except Exception as e:
-        print(f"IODA Error ({source}): {e}")
+    except Exception:
         return None
 
 def main():
-    print("Starting Iran Internet Monitor (CF + IODA)...")
     cf_token = os.environ.get("CF_API_TOKEN")
     
     cf_data = get_cloudflare_data(cf_token)
@@ -78,15 +78,14 @@ def main():
         "last_run": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "cloudflare": cf_data if cf_data else {"error": "Failed"},
         "ioda": {
-            "bgp": bgp_data if bgp_data else {"current": "N/A", "status": "Unknown"},
-            "ping": ping_data if ping_data else {"current": "N/A", "status": "Unknown"}
+            "bgp": bgp_data if bgp_data else {"current": "N/A", "status": "Unknown", "chart_data": []},
+            "ping": ping_data if ping_data else {"current": "N/A", "status": "Unknown", "chart_data": []}
         }
     }
 
     with open('data.json', 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=4)
     print("Data saved to data.json")
-    print(f"Final Output: {json.dumps(output['ioda'], indent=2)}")
 
 if __name__ == "__main__":
     main()
