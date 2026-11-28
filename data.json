@@ -1,10 +1,10 @@
 {
     "status": "Success",
-    "last_run": "2026-11-27T23:11:26Z",
+    "last_run": "2026-11-28T04:50:56Z",
     "cloudflare": {
-        "http_percent": "44.977344",
-        "other_percent": "55.022656",
-        "last_updated": "2026-11-27T21:30:00Z"
+        "http_percent": "44.834711",
+        "other_percent": "55.165289",
+        "last_updated": "2026-11-28T03:15:00Z"
     },
     "ioda": {
         "bgp": {
